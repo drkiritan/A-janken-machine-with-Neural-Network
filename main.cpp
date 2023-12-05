@@ -29,10 +29,10 @@ public:
     // チョキの予想素子 -> y[1]
     // パーの予想素子   -> y[2]
     int y[3] = {0};
-    
+
     // 各予想素子への入力信号
-    int v[3] = {0};
-    
+    int a[3] = {0};
+
     // 教師信号
     // 前回のプレイヤーが出した手をもとに作成
     // グーならば   -> {1, -1, -1}
@@ -42,7 +42,7 @@ public:
 
     // バイアス
     // 発火のしやすさを調整
-    int h[3] = {0};
+    int b[3] = {0};
 
     // 過去N回のプレイヤーが出した手を格納する
     // グーならば   -> {1, -1, -1}
@@ -61,7 +61,7 @@ public:
 
     // 前回のプレイヤーが出した手を格納する
     // 初回はプレイヤーの過去データがないので、乱数で初期化
-    int last_player_hand = rand() % 3;
+    int last_player_hand;
 
     // 全ての処理を総括したメソッド
     int thinking();
@@ -78,12 +78,20 @@ public:
     // WTA則にしたがって、次のプレイヤーの手を予測
     int WinnerTakesAll();
 
-    // v -> y に変換する
-    int sgn(int);
+    // 活性化関数
+    int h(int);
 
     // デバッグモード時に全ての情報が表示される
     void showThinking();
+
+    // コンストラクタ
+    NeuralNetwork();
 };
+
+NeuralNetwork::NeuralNetwork()
+{
+    last_player_hand = rand() % 3;
+}
 
 int NeuralNetwork::thinking()
 {
@@ -101,9 +109,9 @@ void NeuralNetwork::inputData()
         z[i] = -1;
     z[last_player_hand] = 1;
 
-    // 前回の各予想素子の入力信号vを各予想素子yに変換
+    // 前回の各予想素子の入力信号aを各予想素子yに変換
     for (int i = 0; i < 3; i++)
-        y[i] = sgn(v[i]);
+        y[i] = h(a[i]);
 }
 
 void NeuralNetwork::errorCorrection()
@@ -120,7 +128,7 @@ void NeuralNetwork::errorCorrection()
         for (int j = 0; j < N; j++)
             for (int k = 0; k < 3; k++)
                 w[i][j][k] += x[j][k] * (z[i] - y[i]) / 2;
-        h[i] -= (z[i] - y[i]) / 2;
+        b[i] += (z[i] - y[i]) / 2;
     }
 }
 
@@ -131,14 +139,16 @@ void NeuralNetwork::upDate()
         for (int j = 0; j < 3; j++)
             x[N - i - 1][j] = x[N - i - 2][j];
     for (int i = 0; i < 3; i++)
+        //if (z[i] < 0) x[0][i] = 0;
+        //else x[0][i] = 1;
         x[0][i] = z[i];
 }
 
 int NeuralNetwork::WinnerTakesAll()
 {
-    // v の初期化
+    // a の初期化
     for (int i = 0; i < 3; i++)
-        v[i] = 0;
+        a[i] = 0;
 
     // プレイヤーの出す可能性が高い手 -> v[i] が大きい
     // プレイヤーの出す可能性が低い手 -> v[i] が小さい
@@ -146,24 +156,24 @@ int NeuralNetwork::WinnerTakesAll()
     for (int i = 0; i < 3; i++)
         for (int j = 0; j < N; j++)
             for (int k = 0; k < 3; k++)
-                v[i] += w[i][j][k] * x[j][k] - h[i];
+                a[i] += w[i][j][k] * x[j][k] + b[i];
 
     // v[i] が一番大きいときの i（予想された手）を返却
     int max = -10000;
     int predict_hand = 0;
     for (int i = 0; i < 3; i++)
-        if (v[i] > max)
+        if (a[i] > max)
         {
-            max = v[i];
+            max = a[i];
             predict_hand = i;
         }
     return predict_hand;
 }
 
-int NeuralNetwork::sgn(int vk)
+int NeuralNetwork::h(int a_i)
 {
-    // v は様々な値を取るので、-1 もしくは 1 に変換する
-    if (0 <= vk) return 1;
+    // a は様々な値を取るので、-1 もしくは 1 に変換する
+    if (0 <= a_i) return 1;
     return -1;
 }
 
@@ -196,9 +206,9 @@ void NeuralNetwork::showThinking()
         cout << endl;
     }
 
-    cout << "v" << endl;
+    cout << "a" << endl;
     for (int i = 0; i < 3; i++)
-        cout << v[i] << ", ";
+        cout << a[i] << ", ";
     cout << endl << endl;
 }
 
@@ -378,3 +388,4 @@ int main(int argc, char* argv[])
     delete GameObj;
     return 0;
 }
+
